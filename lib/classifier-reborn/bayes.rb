@@ -13,7 +13,7 @@ module ClassifierReborn
     #      b = ClassifierReborn::Bayes.new 'Interesting', 'Uninteresting', 'Spam'
     def initialize(*args)
       @categories = Hash.new
-      options = { language: 'en', auto_categorize: false }
+      options = { language: 'en', auto_categorize: false, stemming: true }
       args.flatten.each { |arg|
         if arg.kind_of?(Hash)
           options.merge!(arg)
@@ -21,6 +21,8 @@ module ClassifierReborn
           add_category(arg)
         end
       }
+      @stemming = options[:stemming]
+      @unknown_word_value = options[:unknown_word_value] || 0.01
       @total_words = 0
       @category_counts = Hash.new(0)
       @category_word_count = Hash.new(0)
@@ -47,7 +49,7 @@ module ClassifierReborn
       end
 
       @category_counts[category] += 1
-      Hasher.word_hash(text, @language).each do |word, count|
+      Hasher.word_hash(text, language: @language, stemming: @stemming).each do |word, count|
         @categories[category][word]      +=     count
         @category_word_count[category]   += count
         @total_words += count
@@ -64,7 +66,7 @@ module ClassifierReborn
     def untrain(category, text)
       category = CategoryNamer.prepare_name(category)
       @category_counts[category] -= 1
-      Hasher.word_hash(text, @language).each do |word, count|
+      Hasher.word_hash(text, language: @language, stemming: @stemming).each do |word, count|
         if @total_words >= 0
           orig = @categories[category][word] || 0
           @categories[category][word]      -=     count
@@ -87,17 +89,17 @@ module ClassifierReborn
     # The largest of these scores (the one closest to 0) is the one picked out by #classify
     def classifications(text)
       score = Hash.new
-      word_hash = Hasher.word_hash(text, @language)
+      word_hash = Hasher.word_hash(text, language: @language, stemming: @stemming)
       training_count = @category_counts.values.reduce(:+).to_f
       @categories.each do |category, category_words|
         score[category.to_s] = 0
         total = (@category_word_count[category] || 1).to_f
         word_hash.each do |word, count|
-          s = category_words.has_key?(word) ? category_words[word] : 0.01
+          s = category_words.has_key?(word) ? category_words[word] : @unknown_word_value
           score[category.to_s] += Math.log(s/total)
         end
         # now add prior probability for the category
-        s = @category_counts.has_key?(category) ? @category_counts[category] : 0.01
+        s = @category_counts.has_key?(category) ? @category_counts[category] : @unknown_word_value
         score[category.to_s] += Math.log(s / training_count)
       end
       return score

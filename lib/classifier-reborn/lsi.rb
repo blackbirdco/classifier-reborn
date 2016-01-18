@@ -65,7 +65,7 @@ module ClassifierReborn
     #   lsi.add_item ar, *ar.categories { |x| ar.content }
     #
     def add_item( item, *categories, &block )
-      clean_word_hash = Hasher.clean_word_hash((block ? block.call(item) : item.to_s), @language)
+      clean_word_hash = Hasher.clean_word_hash((block ? block.call(item) : item.to_s), language: @language)
       @items[item] = if @cache_node_vectors
         CachedContentNode.new(clean_word_hash, *categories)
       else
@@ -304,7 +304,7 @@ module ClassifierReborn
       if @items[item]
         return @items[item]
       else
-        clean_word_hash = Hasher.clean_word_hash((block ? block.call(item) : item.to_s), @language)
+        clean_word_hash = Hasher.clean_word_hash((block ? block.call(item) : item.to_s), language: @language)
 
         cn = ContentNode.new(clean_word_hash, &block) # make the node and extract the data
 
